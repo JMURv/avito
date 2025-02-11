@@ -1,16 +1,22 @@
 package db
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
-	conf "github.com/JMURv/golang-clean-template/internal/config"
+	conf "github.com/JMURv/avito/internal/config"
+	"github.com/JMURv/avito/internal/repo"
+	"github.com/JMURv/avito/pkg/model"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/google/uuid"
 	_ "github.com/lib/pq"
+	"github.com/opentracing/opentracing-go"
 	"go.uber.org/zap"
 	"path/filepath"
+	"strings"
 )
 
 type Repository struct {
@@ -70,4 +76,66 @@ func applyMigrations(db *sql.DB, conf *conf.DBConfig) error {
 
 	zap.L().Info("Applied migrations")
 	return nil
+}
+
+func (r *Repository) GetUserByUsername(ctx context.Context, name string) (*model.User, error) {
+	const op = "store.GetUserByUsername.repo"
+	span, _ := opentracing.StartSpanFromContext(ctx, op)
+	defer span.Finish()
+
+	res := &model.User{}
+	err := r.conn.QueryRow(userGet, name).Scan(&res.ID, &res.Username, &res.Password, &res.Balance)
+	if err != nil && errors.Is(err, sql.ErrNoRows) {
+		return nil, repo.ErrNotFound
+	} else if err != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
+
+func (r *Repository) CreateUser(ctx context.Context, username, pswd string) (uuid.UUID, error) {
+	const op = "store.CreateUser.repo"
+	span, _ := opentracing.StartSpanFromContext(ctx, op)
+	defer span.Finish()
+
+	var id uuid.UUID
+	err := r.conn.QueryRow(userCreate, username, pswd, conf.DefaultBalance).Scan(&id)
+	if err != nil {
+		if strings.Contains(err.Error(), "unique constraint") {
+			return uuid.Nil, repo.ErrAlreadyExists
+		}
+		return uuid.Nil, err
+	}
+
+	return id, nil
+}
+
+func (r *Repository) GetInfo(ctx context.Context, uid uuid.UUID) (*model.InfoResponse, error) {
+	const op = "store.GetInfo.repo"
+	span, _ := opentracing.StartSpanFromContext(ctx, op)
+	defer span.Finish()
+
+	res := &model.InfoResponse{}
+	err := r.conn.QueryRow(getInfo)
+	if err != nil {
+		if strings.Contains(err.Error(), "unique constraint") {
+			return nil, repo.ErrAlreadyExists
+		}
+		return nil, err
+	}
+
+	return id, nil
+}
+
+func (r *Repository) SendCoin(ctx context.Context, req *model.SendCoinRequest) error {
+	const op = "store.SendCoin.repo"
+	span, _ := opentracing.StartSpanFromContext(ctx, op)
+	defer span.Finish()
+}
+
+func (r *Repository) BuyItem(ctx context.Context, item string) error {
+	const op = "store.BuyItem.repo"
+	span, _ := opentracing.StartSpanFromContext(ctx, op)
+	defer span.Finish()
 }

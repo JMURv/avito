@@ -1,9 +1,9 @@
 package middleware
 
 import (
+	"errors"
 	"fmt"
-	"github.com/JMURv/golang-clean-template/internal/ctrl"
-	"github.com/JMURv/golang-clean-template/internal/hdl/http/utils"
+	"github.com/JMURv/avito/internal/hdl/http/utils"
 	"github.com/opentracing/opentracing-go"
 	"go.uber.org/zap"
 	"net/http"
@@ -25,7 +25,7 @@ func RecoverPanic(next http.Handler) http.Handler {
 			defer func() {
 				if err := recover(); err != nil {
 					zap.L().Error("panic", zap.Any("err", err))
-					utils.ErrResponse(w, http.StatusInternalServerError, ctrl.ErrInternalError)
+					utils.ErrResponse(w, http.StatusInternalServerError, errors.New("internal error"))
 				}
 			}()
 			next.ServeHTTP(w, r)

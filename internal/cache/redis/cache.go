@@ -3,8 +3,8 @@ package redis
 import (
 	"context"
 	"encoding/json"
-	"github.com/JMURv/golang-clean-template/internal/cache"
-	cfg "github.com/JMURv/golang-clean-template/internal/config"
+	"github.com/JMURv/avito/internal/cache"
+	cfg "github.com/JMURv/avito/internal/config"
 	"github.com/go-redis/redis/v8"
 	"github.com/opentracing/opentracing-go"
 	"go.uber.org/zap"

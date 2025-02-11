@@ -5,28 +5,19 @@ import (
 	"net/http"
 )
 
-type Response struct {
-	Data any `json:"data"`
-}
-
 type ErrorResponse struct {
-	Error string `json:"error"`
+	Errors string `json:"errors"`
 }
 
-func SuccessPaginatedResponse(w http.ResponseWriter, statusCode int, data any) {
+func StatusResponse(w http.ResponseWriter, statusCode int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
-	json.NewEncoder(w).Encode(data)
 }
 
 func SuccessResponse(w http.ResponseWriter, statusCode int, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
-	json.NewEncoder(w).Encode(
-		&Response{
-			Data: data,
-		},
-	)
+	json.NewEncoder(w).Encode(data)
 }
 
 func ErrResponse(w http.ResponseWriter, statusCode int, err error) {
@@ -34,7 +25,7 @@ func ErrResponse(w http.ResponseWriter, statusCode int, err error) {
 	w.WriteHeader(statusCode)
 	json.NewEncoder(w).Encode(
 		&ErrorResponse{
-			Error: err.Error(),
+			Errors: err.Error(),
 		},
 	)
 }

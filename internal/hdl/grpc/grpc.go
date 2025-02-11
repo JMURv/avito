@@ -3,8 +3,8 @@ package grpc
 import (
 	"errors"
 	"fmt"
-	"github.com/JMURv/golang-clean-template/internal/ctrl"
-	metrics "github.com/JMURv/golang-clean-template/internal/observability/metrics/prometheus"
+	"github.com/JMURv/avito/internal/ctrl"
+	metrics "github.com/JMURv/avito/internal/observability/metrics/prometheus"
 	pm "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
