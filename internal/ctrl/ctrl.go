@@ -17,15 +17,15 @@ type AppRepo interface {
 	GetUserByUsername(ctx context.Context, name string) (*model.User, error)
 	CreateUser(ctx context.Context, username, pswd string) (uuid.UUID, error)
 	GetInfo(ctx context.Context, uid uuid.UUID) (*model.InfoResponse, error)
-	SendCoin(ctx context.Context, req *model.SendCoinRequest) error
-	BuyItem(ctx context.Context, item string) error
+	SendCoin(ctx context.Context, uid uuid.UUID, req *model.SendCoinRequest) error
+	BuyItem(ctx context.Context, uid uuid.UUID, item string) error
 }
 
 type AppCtrl interface {
 	AuthUser(ctx context.Context, req *model.User) (string, error)
 	GetInfo(ctx context.Context, uid uuid.UUID) (*model.InfoResponse, error)
-	SendCoin(ctx context.Context, req *model.SendCoinRequest) error
-	BuyItem(ctx context.Context, item string) error
+	SendCoin(ctx context.Context, uid uuid.UUID, req *model.SendCoinRequest) error
+	BuyItem(ctx context.Context, uid uuid.UUID, item string) error
 }
 
 type CacheService interface {
@@ -109,13 +109,13 @@ func (c *Controller) GetInfo(ctx context.Context, uid uuid.UUID) (*model.InfoRes
 	return res, nil
 }
 
-func (c *Controller) SendCoin(ctx context.Context, req *model.SendCoinRequest) error {
+func (c *Controller) SendCoin(ctx context.Context, uid uuid.UUID, req *model.SendCoinRequest) error {
 	const op = "store.SendCoin.ctrl"
 	span, _ := opentracing.StartSpanFromContext(ctx, op)
 	ctx = opentracing.ContextWithSpan(ctx, span)
 	defer span.Finish()
 
-	err := c.repo.SendCoin(ctx, req)
+	err := c.repo.SendCoin(ctx, uid, req)
 	if err != nil {
 		return err
 	}
@@ -123,13 +123,13 @@ func (c *Controller) SendCoin(ctx context.Context, req *model.SendCoinRequest) e
 	return nil
 }
 
-func (c *Controller) BuyItem(ctx context.Context, item string) error {
+func (c *Controller) BuyItem(ctx context.Context, uid uuid.UUID, item string) error {
 	const op = "store.BuyItem.ctrl"
 	span, _ := opentracing.StartSpanFromContext(ctx, op)
 	ctx = opentracing.ContextWithSpan(ctx, span)
 	defer span.Finish()
 
-	err := c.repo.BuyItem(ctx, item)
+	err := c.repo.BuyItem(ctx, uid, item)
 	if err != nil {
 		return err
 	}

@@ -110,8 +110,22 @@ func (h *Handler) sendCoin(w http.ResponseWriter, r *http.Request) {
 		metrics.ObserveRequest(time.Since(s), c, op)
 	}()
 
+	uidStr, ok := r.Context().Value("uid").(string)
+	if !ok {
+		c = http.StatusBadRequest
+		utils.ErrResponse(w, c, ErrDecodeRequest)
+		return
+	}
+
+	uid, err := uuid.Parse(uidStr)
+	if err != nil {
+		c = http.StatusBadRequest
+		utils.ErrResponse(w, c, ErrDecodeRequest)
+		return
+	}
+
 	req := &model.SendCoinRequest{}
-	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(req); err != nil {
 		c = http.StatusBadRequest
 		zap.L().Debug(
 			"failed to decode request",
@@ -121,7 +135,7 @@ func (h *Handler) sendCoin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := validation.SendCoinReq(req); err != nil {
+	if err = validation.SendCoinReq(req); err != nil {
 		c = http.StatusBadRequest
 		zap.L().Debug(
 			"failed to validate credentials",
@@ -131,7 +145,7 @@ func (h *Handler) sendCoin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := h.ctrl.SendCoin(r.Context(), req)
+	err = h.ctrl.SendCoin(r.Context(), uid, req)
 	if err != nil {
 		c = http.StatusInternalServerError
 		utils.ErrResponse(w, c, ErrInternal)
@@ -148,6 +162,20 @@ func (h *Handler) buyItem(w http.ResponseWriter, r *http.Request) {
 		metrics.ObserveRequest(time.Since(s), c, op)
 	}()
 
+	uidStr, ok := r.Context().Value("uid").(string)
+	if !ok {
+		c = http.StatusBadRequest
+		utils.ErrResponse(w, c, ErrDecodeRequest)
+		return
+	}
+
+	uid, err := uuid.Parse(uidStr)
+	if err != nil {
+		c = http.StatusBadRequest
+		utils.ErrResponse(w, c, ErrDecodeRequest)
+		return
+	}
+
 	item := strings.TrimPrefix(r.URL.Path, "/api/buy/")
 	if item == "" {
 		c = http.StatusBadRequest
@@ -159,7 +187,7 @@ func (h *Handler) buyItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := h.ctrl.BuyItem(r.Context(), item)
+	err = h.ctrl.BuyItem(r.Context(), uid, item)
 	if err != nil {
 		c = http.StatusInternalServerError
 		utils.ErrResponse(w, c, ErrInternal)
