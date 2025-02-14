@@ -351,3 +351,116 @@ func TestHandler_SendCoin(t *testing.T) {
 		)
 	}
 }
+
+func TestHandler_BuyItem(t *testing.T) {
+	mock := gomock.NewController(t)
+	defer mock.Finish()
+
+	mau := mocks.NewMockAuthService(mock)
+	mctrl := mocks.NewMockAppCtrl(mock)
+	h := New(mau, "name", mctrl)
+
+	uid := uuid.NewString()
+	successCtx := context.WithValue(context.Background(), "uid", uid)
+	failureCtx := context.WithValue(context.Background(), "uid", uid+"1")
+	emptyCtx := context.Background()
+	validReq := &gen.BuyItemRequest{
+		Type: "item",
+	}
+
+	tests := []struct {
+		ctx          context.Context
+		name         string
+		req          *gen.BuyItemRequest
+		mockExpect   func()
+		expectedResp func(*testing.T, *gen.Empty, error)
+	}{
+		{
+			ctx:        emptyCtx,
+			name:       "Invalid request -- nil",
+			req:        nil,
+			mockExpect: func() {},
+			expectedResp: func(t *testing.T, res *gen.Empty, err error) {
+				assert.Nil(t, res)
+				assert.Equal(t, codes.InvalidArgument, status.Code(err))
+			},
+		},
+		{
+			ctx:  emptyCtx,
+			name: "Invalid request",
+			req: &gen.BuyItemRequest{
+				Type: "",
+			},
+			mockExpect: func() {},
+			expectedResp: func(t *testing.T, res *gen.Empty, err error) {
+				assert.Nil(t, res)
+				assert.Equal(t, codes.InvalidArgument, status.Code(err))
+			},
+		},
+		{
+			ctx:        emptyCtx,
+			name:       "ErrFailedToGetUUID",
+			req:        validReq,
+			mockExpect: func() {},
+			expectedResp: func(t *testing.T, res *gen.Empty, err error) {
+				assert.Nil(t, res)
+				assert.Equal(t, codes.InvalidArgument, status.Code(err))
+			},
+		},
+		{
+			ctx:        failureCtx,
+			name:       "ErrFailedToParseUUID",
+			req:        validReq,
+			mockExpect: func() {},
+			expectedResp: func(t *testing.T, res *gen.Empty, err error) {
+				assert.Nil(t, res)
+				assert.Equal(t, codes.InvalidArgument, status.Code(err))
+			},
+		},
+		{
+			ctx:  successCtx,
+			name: "ErrNotFound",
+			req:  validReq,
+			mockExpect: func() {
+				mctrl.EXPECT().BuyItem(gomock.Any(), gomock.Any(), gomock.Any()).Return(ctrl.ErrNotFound)
+			},
+			expectedResp: func(t *testing.T, res *gen.Empty, err error) {
+				assert.Nil(t, res)
+				assert.Equal(t, codes.NotFound, status.Code(err))
+			},
+		},
+		{
+			ctx:  successCtx,
+			name: "ErrInternal",
+			req:  validReq,
+			mockExpect: func() {
+				mctrl.EXPECT().BuyItem(gomock.Any(), gomock.Any(), gomock.Any()).Return(errors.New("test-err"))
+			},
+			expectedResp: func(t *testing.T, res *gen.Empty, err error) {
+				assert.Nil(t, res)
+				assert.Equal(t, codes.Internal, status.Code(err))
+			},
+		},
+		{
+			ctx:  successCtx,
+			name: "Success",
+			req:  validReq,
+			mockExpect: func() {
+				mctrl.EXPECT().BuyItem(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(1)
+			},
+			expectedResp: func(t *testing.T, res *gen.Empty, err error) {
+				assert.Equal(t, codes.OK, status.Code(err))
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				tt.mockExpect()
+				res, err := h.BuyItem(tt.ctx, tt.req)
+				tt.expectedResp(t, res, err)
+			},
+		)
+	}
+}
