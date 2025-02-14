@@ -8,6 +8,7 @@ import (
 	conf "github.com/JMURv/avito/internal/config"
 	"github.com/JMURv/avito/internal/repo"
 	"github.com/JMURv/avito/pkg/model"
+	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/google/uuid"
@@ -172,15 +173,19 @@ func (r *Repository) GetInfo(ctx context.Context, uid uuid.UUID, page, size int)
 		}
 
 		if uid == to {
-			rec = append(rec, model.ReceivedCoins{
-				FromUser: fromName,
-				Amount:   amount,
-			})
+			rec = append(
+				rec, model.ReceivedCoins{
+					FromUser: fromName,
+					Amount:   amount,
+				},
+			)
 		} else {
-			sent = append(sent, model.SentCoins{
-				ToUser: toName,
-				Amount: amount,
-			})
+			sent = append(
+				sent, model.SentCoins{
+					ToUser: toName,
+					Amount: amount,
+				},
+			)
 		}
 	}
 
