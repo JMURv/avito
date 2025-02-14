@@ -3,7 +3,10 @@ package grpc
 import (
 	"errors"
 	"fmt"
+	"github.com/JMURv/avito/api/grpc/gen"
+	"github.com/JMURv/avito/internal/auth"
 	"github.com/JMURv/avito/internal/ctrl"
+	"github.com/JMURv/avito/internal/hdl/grpc/interceptors"
 	metrics "github.com/JMURv/avito/internal/observability/metrics/prometheus"
 	pm "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"go.uber.org/zap"
@@ -15,14 +18,16 @@ import (
 )
 
 type Handler struct {
+	gen.StoreServer
 	srv  *grpc.Server
 	hsrv *health.Server
 	ctrl ctrl.AppCtrl
 }
 
-func New(name string, ctrl ctrl.AppCtrl) *Handler {
+func New(au auth.AuthService, name string, ctrl ctrl.AppCtrl) *Handler {
 	srv := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
+			interceptors.AuthUnaryInterceptor(au),
 			metrics.SrvMetrics.UnaryServerInterceptor(
 				pm.WithExemplarFromContext(metrics.Exemplar),
 			),
@@ -46,6 +51,7 @@ func New(name string, ctrl ctrl.AppCtrl) *Handler {
 }
 
 func (h *Handler) Start(port int) {
+	gen.RegisterStoreServer(h.srv, h)
 	grpc_health_v1.RegisterHealthServer(h.srv, h.hsrv)
 
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%v", port))

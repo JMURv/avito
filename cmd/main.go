@@ -3,10 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/JMURv/avito/internal/cache/redis"
+	"github.com/JMURv/avito/internal/auth"
 	"github.com/JMURv/avito/internal/config"
 	"github.com/JMURv/avito/internal/ctrl"
-	"github.com/JMURv/avito/internal/hdl/grpc"
+	hdl "github.com/JMURv/avito/internal/hdl/http"
 	"github.com/JMURv/avito/internal/observability/metrics/prometheus"
 	"github.com/JMURv/avito/internal/observability/tracing/jaeger"
 	"github.com/JMURv/avito/internal/repo/db"
@@ -44,10 +44,10 @@ func main() {
 	go prometheus.New(conf.Server.Port + 5).Start(ctx)
 	go jaeger.Start(ctx, conf.ServiceName, conf.Jaeger)
 
-	cache := redis.New(conf.Redis)
+	au := auth.New(conf.Secret)
 	repo := db.New(conf.DB)
-	svc := ctrl.New(repo, cache)
-	h := grpc.New(conf.ServiceName, svc)
+	svc := ctrl.New(au, repo)
+	h := hdl.New(au, svc)
 
 	zap.L().Info(
 		fmt.Sprintf(
@@ -64,12 +64,8 @@ func main() {
 	<-c
 
 	zap.L().Info("Shutting down gracefully...")
-	if err := h.Close(); err != nil {
+	if err := h.Close(ctx); err != nil {
 		zap.L().Warn("Error closing handler", zap.Error(err))
-	}
-
-	if err := cache.Close(); err != nil {
-		zap.L().Warn("Failed to close connection to Redis: ", zap.Error(err))
 	}
 
 	if err := repo.Close(); err != nil {

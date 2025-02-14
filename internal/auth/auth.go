@@ -28,12 +28,12 @@ func New(secret string) *Auth {
 	return &Auth{secret: secret}
 }
 
-func HashPassword(password string) (string, error) {
+func (a *Auth) HashPassword(password string) (string, error) {
 	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14)
 	return string(bytes), err
 }
 
-func ComparePasswords(pswd, pswdCompare []byte) error {
+func (a *Auth) ComparePasswords(pswd, pswdCompare []byte) error {
 	if err := bcrypt.CompareHashAndPassword(pswd, pswdCompare); err != nil {
 		return ErrInvalidCredentials
 	}

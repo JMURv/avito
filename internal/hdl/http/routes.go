@@ -4,20 +4,19 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/JMURv/avito/internal/auth"
-	"github.com/JMURv/avito/internal/ctrl"
+	"github.com/JMURv/avito/internal/dto"
+	"github.com/JMURv/avito/internal/hdl"
 	"github.com/JMURv/avito/internal/hdl/http/middleware"
 	"github.com/JMURv/avito/internal/hdl/http/utils"
 	"github.com/JMURv/avito/internal/hdl/validation"
+	"github.com/JMURv/avito/internal/model"
 	metrics "github.com/JMURv/avito/internal/observability/metrics/prometheus"
-	"github.com/JMURv/avito/pkg/model"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 	"net/http"
 	"strings"
 	"time"
 )
-
-// TODO: Logs to hdls
 
 func RegisterStoreRoutes(mux *http.ServeMux, h *Handler) {
 	mux.HandleFunc("/api/auth", h.auth)
@@ -33,6 +32,12 @@ func (h *Handler) auth(w http.ResponseWriter, r *http.Request) {
 		metrics.ObserveRequest(time.Since(s), c, op)
 	}()
 
+	if r.Method != http.MethodPost {
+		c = http.StatusMethodNotAllowed
+		utils.ErrResponse(w, c, ErrMethodNotAllowed)
+		return
+	}
+
 	req := &model.User{}
 	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
 		c = http.StatusBadRequest
@@ -40,14 +45,14 @@ func (h *Handler) auth(w http.ResponseWriter, r *http.Request) {
 			"failed to decode request",
 			zap.String("op", op), zap.Error(err),
 		)
-		utils.ErrResponse(w, c, ErrDecodeRequest)
+		utils.ErrResponse(w, c, hdl.ErrDecodeRequest)
 		return
 	}
 
 	if err := validation.AuthReq(req); err != nil {
 		c = http.StatusBadRequest
 		zap.L().Debug(
-			"failed to validate credentials",
+			"failed to validate auth request",
 			zap.String("op", op), zap.Error(err),
 		)
 		utils.ErrResponse(w, c, err)
@@ -59,13 +64,13 @@ func (h *Handler) auth(w http.ResponseWriter, r *http.Request) {
 		c = http.StatusUnauthorized
 		utils.ErrResponse(w, c, err)
 		return
-	} else if err != nil && errors.Is(err, ctrl.ErrAlreadyExists) {
-		c = http.StatusConflict
-		utils.ErrResponse(w, c, ErrAlreadyExists)
-		return
 	} else if err != nil {
 		c = http.StatusInternalServerError
-		utils.ErrResponse(w, c, ErrInternal)
+		zap.L().Debug(
+			hdl.ErrInternal.Error(),
+			zap.String("op", op), zap.Error(err),
+		)
+		utils.ErrResponse(w, c, hdl.ErrInternal)
 		return
 	}
 
@@ -79,24 +84,42 @@ func (h *Handler) getInfo(w http.ResponseWriter, r *http.Request) {
 		metrics.ObserveRequest(time.Since(s), c, op)
 	}()
 
+	if r.Method != http.MethodGet {
+		c = http.StatusMethodNotAllowed
+		utils.ErrResponse(w, c, ErrMethodNotAllowed)
+		return
+	}
+
 	uidStr, ok := r.Context().Value("uid").(string)
 	if !ok {
 		c = http.StatusBadRequest
-		utils.ErrResponse(w, c, ErrDecodeRequest)
+		zap.L().Error(
+			hdl.ErrFailedToGetUUID.Error(),
+			zap.String("op", op), zap.Any("uid", r.Context().Value("uid")),
+		)
+		utils.ErrResponse(w, c, hdl.ErrDecodeRequest)
 		return
 	}
 
 	uid, err := uuid.Parse(uidStr)
 	if err != nil {
 		c = http.StatusBadRequest
-		utils.ErrResponse(w, c, ErrDecodeRequest)
+		zap.L().Error(
+			hdl.ErrFailedToParseUUID.Error(),
+			zap.String("op", op), zap.String("uid", uidStr),
+		)
+		utils.ErrResponse(w, c, hdl.ErrDecodeRequest)
 		return
 	}
 
 	res, err := h.ctrl.GetInfo(r.Context(), uid)
 	if err != nil {
 		c = http.StatusInternalServerError
-		utils.ErrResponse(w, c, ErrInternal)
+		zap.L().Debug(
+			hdl.ErrInternal.Error(),
+			zap.String("op", op), zap.Error(err),
+		)
+		utils.ErrResponse(w, c, hdl.ErrInternal)
 		return
 	}
 
@@ -110,35 +133,49 @@ func (h *Handler) sendCoin(w http.ResponseWriter, r *http.Request) {
 		metrics.ObserveRequest(time.Since(s), c, op)
 	}()
 
+	if r.Method != http.MethodPost {
+		c = http.StatusMethodNotAllowed
+		utils.ErrResponse(w, c, ErrMethodNotAllowed)
+		return
+	}
+
 	uidStr, ok := r.Context().Value("uid").(string)
 	if !ok {
 		c = http.StatusBadRequest
-		utils.ErrResponse(w, c, ErrDecodeRequest)
+		zap.L().Error(
+			hdl.ErrFailedToGetUUID.Error(),
+			zap.String("op", op), zap.Any("uid", r.Context().Value("uid")),
+		)
+		utils.ErrResponse(w, c, hdl.ErrDecodeRequest)
 		return
 	}
 
 	uid, err := uuid.Parse(uidStr)
 	if err != nil {
 		c = http.StatusBadRequest
-		utils.ErrResponse(w, c, ErrDecodeRequest)
+		zap.L().Error(
+			hdl.ErrFailedToParseUUID.Error(),
+			zap.String("op", op), zap.String("uid", uidStr),
+		)
+		utils.ErrResponse(w, c, hdl.ErrDecodeRequest)
 		return
 	}
 
-	req := &model.SendCoinRequest{}
+	req := &dto.SendCoinRequest{}
 	if err = json.NewDecoder(r.Body).Decode(req); err != nil {
 		c = http.StatusBadRequest
 		zap.L().Debug(
 			"failed to decode request",
 			zap.String("op", op), zap.Error(err),
 		)
-		utils.ErrResponse(w, c, ErrDecodeRequest)
+		utils.ErrResponse(w, c, hdl.ErrDecodeRequest)
 		return
 	}
 
 	if err = validation.SendCoinReq(req); err != nil {
 		c = http.StatusBadRequest
 		zap.L().Debug(
-			"failed to validate credentials",
+			"failed to validate request",
 			zap.String("op", op), zap.Error(err),
 		)
 		utils.ErrResponse(w, c, err)
@@ -148,7 +185,11 @@ func (h *Handler) sendCoin(w http.ResponseWriter, r *http.Request) {
 	err = h.ctrl.SendCoin(r.Context(), uid, req)
 	if err != nil {
 		c = http.StatusInternalServerError
-		utils.ErrResponse(w, c, ErrInternal)
+		zap.L().Debug(
+			hdl.ErrInternal.Error(),
+			zap.String("op", op), zap.Error(err),
+		)
+		utils.ErrResponse(w, c, hdl.ErrInternal)
 		return
 	}
 
@@ -162,17 +203,31 @@ func (h *Handler) buyItem(w http.ResponseWriter, r *http.Request) {
 		metrics.ObserveRequest(time.Since(s), c, op)
 	}()
 
+	if r.Method != http.MethodGet {
+		c = http.StatusMethodNotAllowed
+		utils.ErrResponse(w, c, ErrMethodNotAllowed)
+		return
+	}
+
 	uidStr, ok := r.Context().Value("uid").(string)
 	if !ok {
 		c = http.StatusBadRequest
-		utils.ErrResponse(w, c, ErrDecodeRequest)
+		zap.L().Error(
+			hdl.ErrFailedToGetUUID.Error(),
+			zap.String("op", op), zap.Any("uid", r.Context().Value("uid")),
+		)
+		utils.ErrResponse(w, c, hdl.ErrDecodeRequest)
 		return
 	}
 
 	uid, err := uuid.Parse(uidStr)
 	if err != nil {
 		c = http.StatusBadRequest
-		utils.ErrResponse(w, c, ErrDecodeRequest)
+		zap.L().Error(
+			hdl.ErrFailedToParseUUID.Error(),
+			zap.String("op", op), zap.String("uid", uidStr),
+		)
+		utils.ErrResponse(w, c, hdl.ErrDecodeRequest)
 		return
 	}
 
@@ -180,8 +235,8 @@ func (h *Handler) buyItem(w http.ResponseWriter, r *http.Request) {
 	if item == "" {
 		c = http.StatusBadRequest
 		zap.L().Debug(
-			"failed to parse item",
-			zap.String("op", op),
+			"failed to parse url param",
+			zap.String("op", op), zap.String("path", r.URL.Path),
 		)
 		utils.ErrResponse(w, c, ErrItemIsRequired)
 		return
@@ -190,7 +245,11 @@ func (h *Handler) buyItem(w http.ResponseWriter, r *http.Request) {
 	err = h.ctrl.BuyItem(r.Context(), uid, item)
 	if err != nil {
 		c = http.StatusInternalServerError
-		utils.ErrResponse(w, c, ErrInternal)
+		zap.L().Debug(
+			hdl.ErrInternal.Error(),
+			zap.String("op", op), zap.Error(err),
+		)
+		utils.ErrResponse(w, c, hdl.ErrInternal)
 		return
 	}
 	utils.StatusResponse(w, c)

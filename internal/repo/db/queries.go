@@ -1,45 +1,11 @@
 package db
 
-const userGet = `
+const getUser = `
 SELECT id, username, password, balance 
 FROM users
 WHERE username = $1
 `
 
-const getUserBalanceByID = `
-SELECT balance 
-FROM users
-WHERE id = $1
-`
-
-const userCreate = `
-INSERT INTO users (username, password, balance) 
-VALUES ($1, $2, $3) 
-RETURNING id
-`
-
-const getItem = `
-SELECT id, name, price 
-FROM items 
-WHERE name=$1
-`
-
-const getInfo = `
-SELECT u.balance, 
-    	ARRAY_AGG(
-             inv.item_id || '|' || inv.quantity || '|' || i.name
-		) AS inventory,
-    	ARRAY_AGG(
-             t.from_user || '|' || t.to_user || '|' || t.amount
-		) AS transactions
-FROM users u
-JOIN inventory inv ON inv.user_id=u.id
-JOIN items i ON i.id=inv.item_id
-JOIN transactions t ON t.from_user_id=u.id OR t.to_user_id=u.id
-WHERE u.id=$1;
-`
-
-// SEP QUERIES
 const getUserBalance = `
 SELECT u.balance FROM users WHERE u.id=$1
 `
@@ -66,7 +32,17 @@ WHERE from_user_id=$1 OR to_user_id=$1
 LIMIT $2 OFFSET $3
 `
 
-// END SEP QUERIES
+const createUser = `
+INSERT INTO users (username, password, balance) 
+VALUES ($1, $2, $3) 
+RETURNING id
+`
+
+const getItem = `
+SELECT id, name, price 
+FROM items 
+WHERE name=$1
+`
 
 const sendCoinFrom = `
 UPDATE users SET amount=amount-$1

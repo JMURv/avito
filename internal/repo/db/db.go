@@ -6,8 +6,9 @@ import (
 	"errors"
 	"fmt"
 	conf "github.com/JMURv/avito/internal/config"
+	"github.com/JMURv/avito/internal/dto"
+	"github.com/JMURv/avito/internal/model"
 	"github.com/JMURv/avito/internal/repo"
-	"github.com/JMURv/avito/pkg/model"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
@@ -84,7 +85,7 @@ func (r *Repository) GetUserByUsername(ctx context.Context, name string) (*model
 	defer span.Finish()
 
 	res := &model.User{}
-	err := r.conn.QueryRow(userGet, name).Scan(&res.ID, &res.Username, &res.Password, &res.Balance)
+	err := r.conn.QueryRow(getUser, name).Scan(&res.ID, &res.Username, &res.Password, &res.Balance)
 	if err != nil && errors.Is(err, sql.ErrNoRows) {
 		return nil, repo.ErrNotFound
 	} else if err != nil {
@@ -100,7 +101,7 @@ func (r *Repository) CreateUser(ctx context.Context, username, pswd string) (uui
 	defer span.Finish()
 
 	var id uuid.UUID
-	err := r.conn.QueryRow(userCreate, username, pswd, conf.DefaultBalance).Scan(&id)
+	err := r.conn.QueryRow(createUser, username, pswd, conf.DefaultBalance).Scan(&id)
 	if err != nil {
 		if strings.Contains(err.Error(), "unique constraint") {
 			return uuid.Nil, repo.ErrAlreadyExists
@@ -111,12 +112,12 @@ func (r *Repository) CreateUser(ctx context.Context, username, pswd string) (uui
 	return id, nil
 }
 
-func (r *Repository) GetInfo(ctx context.Context, uid uuid.UUID, page, size int) (*model.InfoResponse, error) {
+func (r *Repository) GetInfo(ctx context.Context, uid uuid.UUID, page, size int) (*dto.InfoResponse, error) {
 	const op = "store.GetInfo.repo"
 	span, _ := opentracing.StartSpanFromContext(ctx, op)
 	defer span.Finish()
 
-	res := &model.InfoResponse{}
+	res := &dto.InfoResponse{}
 	err := r.conn.QueryRow(getUserBalance, uid).Scan(&res.Coins)
 	if err != nil && errors.Is(err, sql.ErrNoRows) {
 		return nil, repo.ErrNotFound
@@ -124,7 +125,7 @@ func (r *Repository) GetInfo(ctx context.Context, uid uuid.UUID, page, size int)
 		return nil, err
 	}
 
-	rows, err := r.conn.Query(getUserInventory, uid, size, page*size)
+	rows, err := r.conn.Query(getUserInventory, uid, size, (page-1)*size)
 	if err != nil && errors.Is(err, sql.ErrNoRows) {
 		return nil, repo.ErrNotFound
 	} else if err != nil {
@@ -136,9 +137,9 @@ func (r *Repository) GetInfo(ctx context.Context, uid uuid.UUID, page, size int)
 		}
 	}(rows)
 
-	invItms := make([]model.Inventory, 0, size)
+	invItms := make([]dto.Inventory, 0, size)
 	for rows.Next() {
-		i := model.Inventory{}
+		i := dto.Inventory{}
 		if err = rows.Scan(&i.Quantity, &i.Type); err != nil {
 			return nil, err
 		}
@@ -149,7 +150,7 @@ func (r *Repository) GetInfo(ctx context.Context, uid uuid.UUID, page, size int)
 		return nil, err
 	}
 
-	rows, err = r.conn.Query(getUserTransactions, uid, size, page*size) // TODO: CHANGE TO REAL VAL
+	rows, err = r.conn.Query(getUserTransactions, uid, size, (page-1)*size)
 	if err != nil && errors.Is(err, sql.ErrNoRows) {
 		return nil, repo.ErrNotFound
 	} else if err != nil {
@@ -161,8 +162,8 @@ func (r *Repository) GetInfo(ctx context.Context, uid uuid.UUID, page, size int)
 		}
 	}(rows)
 
-	rec := make([]model.ReceivedCoins, 0, size)
-	sent := make([]model.SentCoins, 0, size)
+	rec := make([]dto.ReceivedCoins, 0, size)
+	sent := make([]dto.SentCoins, 0, size)
 	for rows.Next() {
 		var amount int
 		var from, to uuid.UUID
@@ -174,14 +175,14 @@ func (r *Repository) GetInfo(ctx context.Context, uid uuid.UUID, page, size int)
 
 		if uid == to {
 			rec = append(
-				rec, model.ReceivedCoins{
+				rec, dto.ReceivedCoins{
 					FromUser: fromName,
 					Amount:   amount,
 				},
 			)
 		} else {
 			sent = append(
-				sent, model.SentCoins{
+				sent, dto.SentCoins{
 					ToUser: toName,
 					Amount: amount,
 				},
@@ -196,12 +197,16 @@ func (r *Repository) GetInfo(ctx context.Context, uid uuid.UUID, page, size int)
 	return res, nil
 }
 
-func (r *Repository) SendCoin(ctx context.Context, uid uuid.UUID, req *model.SendCoinRequest) error {
+func (r *Repository) SendCoin(ctx context.Context, uid uuid.UUID, req *dto.SendCoinRequest) error {
 	const op = "store.SendCoin.repo"
 	span, _ := opentracing.StartSpanFromContext(ctx, op)
 	defer span.Finish()
 
-	tx, err := r.conn.Begin()
+	tx, err := r.conn.BeginTx(
+		ctx, &sql.TxOptions{
+			Isolation: sql.LevelSerializable,
+		},
+	)
 	if err != nil {
 		return err
 	}
@@ -313,7 +318,11 @@ func (r *Repository) BuyItem(ctx context.Context, uid uuid.UUID, item string) er
 	span, _ := opentracing.StartSpanFromContext(ctx, op)
 	defer span.Finish()
 
-	tx, err := r.conn.Begin()
+	tx, err := r.conn.BeginTx(
+		ctx, &sql.TxOptions{
+			Isolation: sql.LevelSerializable,
+		},
+	)
 	if err != nil {
 		return err
 	}

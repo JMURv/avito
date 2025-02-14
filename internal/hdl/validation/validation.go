@@ -1,7 +1,8 @@
 package validation
 
 import (
-	"github.com/JMURv/avito/pkg/model"
+	"github.com/JMURv/avito/internal/dto"
+	"github.com/JMURv/avito/internal/model"
 )
 
 func AuthReq(req *model.User) error {
@@ -13,14 +14,14 @@ func AuthReq(req *model.User) error {
 		return PasswordIsRequired
 	}
 
-	if len(req.Password) > 5 {
+	if len(req.Password) < 5 {
 		return PasswordIsTooShort
 	}
 
 	return nil
 }
 
-func SendCoinReq(req *model.SendCoinRequest) error {
+func SendCoinReq(req *dto.SendCoinRequest) error {
 	if req.ToUser == "" {
 		return ToUserIsRequired
 	}

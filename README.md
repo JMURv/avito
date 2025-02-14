@@ -131,3 +131,18 @@ Shutdown manifests
 ```shell
 task k-down
 ```
+
+```sql
+SELECT u.balance, 
+    	ARRAY_AGG(
+             inv.item_id || '|' || inv.quantity || '|' || i.name
+		) AS inventory,
+    	ARRAY_AGG(
+             t.from_user || '|' || t.to_user || '|' || t.amount
+		) AS transactions
+FROM users u
+JOIN inventory inv ON inv.user_id=u.id
+JOIN items i ON i.id=inv.item_id
+JOIN transactions t ON t.from_user_id=u.id OR t.to_user_id=u.id
+WHERE u.id=$1;
+```

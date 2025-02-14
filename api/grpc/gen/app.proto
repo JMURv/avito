@@ -1,0 +1,56 @@
+syntax = "proto3";
+package avito;
+option go_package = "github.com/JMURv/avito/api/grpc/gen";
+
+message Empty {}
+
+service Store {
+  rpc Auth(AuthReq) returns (TokenRes);
+  rpc GetInfo(Empty) returns (InfoResponse);
+  rpc SendCoin(SendCoinRequest) returns (Empty);
+  rpc BuyItem(BuyItemRequest) returns (Empty);
+}
+
+message AuthReq {
+  string username = 1;
+  string password = 2;
+}
+
+message TokenRes {
+  string token = 1;
+}
+
+message InfoResponse {
+  int64 coins = 1;
+  repeated Inventory inventory = 2;
+  CoinHistory coinHistory = 3;
+}
+
+message Inventory {
+  string type = 1;
+  int32 quantity = 2;
+}
+
+message CoinHistory {
+  repeated ReceivedCoins received = 1;
+  repeated SentCoins sent = 2;
+}
+
+message ReceivedCoins {
+  string fromUser = 1;
+  int64 amount = 2;
+}
+
+message SentCoins {
+  string toUser = 1;
+  int64 amount = 2;
+}
+
+message SendCoinRequest {
+  string toUser = 1;
+  int64 amount = 2;
+}
+
+message BuyItemRequest {
+  string type = 1;
+}
