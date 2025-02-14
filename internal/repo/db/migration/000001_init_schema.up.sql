@@ -7,19 +7,20 @@ CREATE TABLE users (
 );
 
 CREATE TABLE items (
-    name  VARCHAR(255) PRIMARY KEY,
+    id UUID PRIMARY KEY,
+    name  VARCHAR(255),
     price INT                 NOT NULL
         CONSTRAINT positive_price CHECK (price > 0)
 );
 
 CREATE TABLE inventory (
     user_id  UUID NOT NULL,
-    item_name  VARCHAR(255) NOT NULL,
+    item_id  VARCHAR(255) NOT NULL,
     quantity INT  NOT NULL
         CONSTRAINT positive_quantity CHECK (quantity > 0),
-    PRIMARY KEY (user_id, item_name),
+    PRIMARY KEY (user_id, item_id),
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
-    FOREIGN KEY (item_name) REFERENCES items (name) ON DELETE CASCADE
+    FOREIGN KEY (item_id) REFERENCES items (id) ON DELETE CASCADE
 );
 
 CREATE TABLE transactions (
@@ -31,6 +32,8 @@ CREATE TABLE transactions (
     FOREIGN KEY (to_user_id) REFERENCES users (id) ON DELETE SET NULL
 );
 
+CREATE INDEX idx_user_username ON users(username);
 CREATE INDEX idx_inventory_user ON inventory(user_id);
+CREATE INDEX idx_inventory_item ON inventory(item_id);
 CREATE INDEX idx_transactions_from ON transactions(from_user_id);
 CREATE INDEX idx_transactions_to ON transactions(to_user_id);

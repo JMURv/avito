@@ -14,21 +14,26 @@ type SendCoinRequest struct {
 	Amount int    `json:"amount"`
 }
 
-type InfoResponse struct {
-	Coins     int `json:"coins"`
-	Inventory []struct {
-		Type     string `json:"type"`
-		Quantity int    `json:"quantity"`
-	} `json:"inventory"`
-	CoinHistory struct {
-		Received []struct {
-			FromUser string `json:"fromUser"`
-			Amount   int    `json:"amount"`
-		} `json:"recieved"`
+type Inventory struct {
+	Type     string `json:"type"`
+	Quantity int    `json:"quantity"`
+}
 
-		Sent []struct {
-			ToUser string `json:"toUser"`
-			Amount int    `json:"amount"`
-		} `json:"sent"`
+type ReceivedCoins struct {
+	FromUser string `json:"fromUser"`
+	Amount   int    `json:"amount"`
+}
+
+type SentCoins struct {
+	ToUser string `json:"toUser"`
+	Amount int    `json:"amount"`
+}
+
+type InfoResponse struct {
+	Coins       int         `json:"coins"`
+	Inventory   []Inventory `json:"inventory"`
+	CoinHistory struct {
+		Received []ReceivedCoins `json:"recieved"`
+		Sent     []SentCoins     `json:"sent"`
 	} `json:"coinHistory"`
 }

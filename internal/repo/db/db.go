@@ -8,7 +8,6 @@ import (
 	conf "github.com/JMURv/avito/internal/config"
 	"github.com/JMURv/avito/internal/repo"
 	"github.com/JMURv/avito/pkg/model"
-	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/google/uuid"
@@ -111,31 +110,281 @@ func (r *Repository) CreateUser(ctx context.Context, username, pswd string) (uui
 	return id, nil
 }
 
-func (r *Repository) GetInfo(ctx context.Context, uid uuid.UUID) (*model.InfoResponse, error) {
+func (r *Repository) GetInfo(ctx context.Context, uid uuid.UUID, page, size int) (*model.InfoResponse, error) {
 	const op = "store.GetInfo.repo"
 	span, _ := opentracing.StartSpanFromContext(ctx, op)
 	defer span.Finish()
 
 	res := &model.InfoResponse{}
-	err := r.conn.QueryRow(getInfo)
-	if err != nil {
-		if strings.Contains(err.Error(), "unique constraint") {
-			return nil, repo.ErrAlreadyExists
-		}
+	err := r.conn.QueryRow(getUserBalance, uid).Scan(&res.Coins)
+	if err != nil && errors.Is(err, sql.ErrNoRows) {
+		return nil, repo.ErrNotFound
+	} else if err != nil {
 		return nil, err
 	}
 
-	return id, nil
+	rows, err := r.conn.Query(getUserInventory, uid, size, page*size)
+	if err != nil && errors.Is(err, sql.ErrNoRows) {
+		return nil, repo.ErrNotFound
+	} else if err != nil {
+		return nil, err
+	}
+	defer func(rows *sql.Rows) {
+		if err := rows.Close(); err != nil {
+			zap.L().Error("Error while closing rows", zap.Error(err))
+		}
+	}(rows)
+
+	invItms := make([]model.Inventory, 0, size)
+	for rows.Next() {
+		i := model.Inventory{}
+		if err = rows.Scan(&i.Quantity, &i.Type); err != nil {
+			return nil, err
+		}
+		invItms = append(invItms, i)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	rows, err = r.conn.Query(getUserTransactions, uid, size, page*size) // TODO: CHANGE TO REAL VAL
+	if err != nil && errors.Is(err, sql.ErrNoRows) {
+		return nil, repo.ErrNotFound
+	} else if err != nil {
+		return nil, err
+	}
+	defer func(rows *sql.Rows) {
+		if err := rows.Close(); err != nil {
+			zap.L().Error("Error while closing rows", zap.Error(err))
+		}
+	}(rows)
+
+	rec := make([]model.ReceivedCoins, 0, size)
+	sent := make([]model.SentCoins, 0, size)
+	for rows.Next() {
+		var amount int
+		var from, to uuid.UUID
+		var fromName, toName string
+
+		if err = rows.Scan(&from, &fromName, &to, &toName, &amount); err != nil {
+			return nil, err
+		}
+
+		if uid == to {
+			rec = append(rec, model.ReceivedCoins{
+				FromUser: fromName,
+				Amount:   amount,
+			})
+		} else {
+			sent = append(sent, model.SentCoins{
+				ToUser: toName,
+				Amount: amount,
+			})
+		}
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return res, nil
 }
 
-func (r *Repository) SendCoin(ctx context.Context, req *model.SendCoinRequest) error {
+func (r *Repository) SendCoin(ctx context.Context, uid uuid.UUID, req *model.SendCoinRequest) error {
 	const op = "store.SendCoin.repo"
 	span, _ := opentracing.StartSpanFromContext(ctx, op)
 	defer span.Finish()
+
+	tx, err := r.conn.Begin()
+	if err != nil {
+		return err
+	}
+
+	res, err := tx.Exec(sendCoinFrom, req.Amount, uid)
+	if err != nil {
+		if err = tx.Rollback(); err != nil {
+			zap.L().Error(
+				"Error while transaction rollback",
+				zap.String("uid", uid.String()), zap.Any("req", req),
+			)
+			return err
+		}
+		return err
+	}
+
+	aff, err := res.RowsAffected()
+	if err != nil {
+		if err = tx.Rollback(); err != nil {
+			zap.L().Error(
+				"Error while transaction rollback",
+				zap.String("uid", uid.String()), zap.Any("req", req),
+			)
+			return err
+		}
+		return err
+	}
+
+	if aff == 0 {
+		if err != nil {
+			if err = tx.Rollback(); err != nil {
+				zap.L().Error(
+					"Error while transaction rollback",
+					zap.String("uid", uid.String()), zap.Any("req", req),
+				)
+				return err
+			}
+			return err
+		}
+		return repo.ErrNotFound
+	}
+
+	res, err = tx.Exec(sendCoinTo, req.Amount, req.ToUser)
+	if err != nil {
+		if err = tx.Rollback(); err != nil {
+			zap.L().Error(
+				"Error while transaction rollback",
+				zap.String("uid", uid.String()), zap.Any("req", req),
+			)
+			return err
+		}
+		return err
+	}
+
+	aff, err = res.RowsAffected()
+	if err != nil {
+		if err = tx.Rollback(); err != nil {
+			zap.L().Error(
+				"Error while transaction rollback",
+				zap.String("uid", uid.String()), zap.Any("req", req),
+			)
+			return err
+		}
+		return err
+	}
+
+	if aff == 0 {
+		if err != nil {
+			if err = tx.Rollback(); err != nil {
+				zap.L().Error(
+					"Error while transaction rollback",
+					zap.String("uid", uid.String()), zap.Any("req", req),
+				)
+				return err
+			}
+			return err
+		}
+		return repo.ErrNotFound
+	}
+
+	res, err = tx.Exec(createTransaction, uid, req.ToUser, req.Amount)
+	if err != nil {
+		if err = tx.Rollback(); err != nil {
+			zap.L().Error(
+				"Error while transaction rollback",
+				zap.String("uid", uid.String()), zap.Any("req", req),
+			)
+			return err
+		}
+		return err
+	}
+
+	if _, err = res.LastInsertId(); err != nil {
+		if err = tx.Rollback(); err != nil {
+			zap.L().Error(
+				"Error while transaction rollback",
+				zap.String("uid", uid.String()), zap.Any("req", req),
+			)
+			return err
+		}
+		return err
+	}
+
+	return tx.Commit()
 }
 
-func (r *Repository) BuyItem(ctx context.Context, item string) error {
+func (r *Repository) BuyItem(ctx context.Context, uid uuid.UUID, item string) error {
 	const op = "store.BuyItem.repo"
 	span, _ := opentracing.StartSpanFromContext(ctx, op)
 	defer span.Finish()
+
+	tx, err := r.conn.Begin()
+	if err != nil {
+		return err
+	}
+
+	itemObj := model.Item{}
+	err = tx.QueryRow(getItem, item).Scan(
+		&itemObj.ID, &itemObj.Name, &itemObj.Price,
+	)
+	if err != nil && errors.Is(err, sql.ErrNoRows) {
+		return repo.ErrNotFound
+	} else if err != nil {
+		return err
+	}
+
+	res, err := tx.Exec(sendCoinFrom, itemObj.Price, uid)
+	if err != nil {
+		if err = tx.Rollback(); err != nil {
+			zap.L().Error(
+				"Error while transaction rollback",
+				zap.String("uid", uid.String()), zap.Any("item", item),
+			)
+			return err
+		}
+		return err
+	}
+
+	aff, err := res.RowsAffected()
+	if err != nil {
+		if err = tx.Rollback(); err != nil {
+			zap.L().Error(
+				"Error while transaction rollback",
+				zap.String("uid", uid.String()), zap.Any("item", item),
+			)
+			return err
+		}
+		return err
+	}
+
+	if aff == 0 {
+		if err != nil {
+			if err = tx.Rollback(); err != nil {
+				zap.L().Error(
+					"Error while transaction rollback",
+					zap.String("uid", uid.String()), zap.Any("item", item),
+				)
+				return err
+			}
+			return err
+		}
+		return repo.ErrNotFound
+	}
+
+	quan := 1
+	err = tx.QueryRow(getInventoryQuantity, uid, itemObj.ID).Scan(&quan)
+	if err != nil && errors.Is(err, sql.ErrNoRows) {
+		res, err = tx.Exec(createInventory, uid, itemObj.ID, quan)
+		if err != nil {
+			if err = tx.Rollback(); err != nil {
+				zap.L().Error(
+					"Error while transaction rollback",
+					zap.String("uid", uid.String()), zap.Any("item", item),
+				)
+				return err
+			}
+			return err
+		}
+	} else if err != nil {
+		if err = tx.Rollback(); err != nil {
+			zap.L().Error(
+				"Error while transaction rollback",
+				zap.String("uid", uid.String()), zap.Any("item", item),
+			)
+			return err
+		}
+		return err
+	}
+
+	return tx.Commit()
 }
