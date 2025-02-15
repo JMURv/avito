@@ -26,5 +26,5 @@ jobs:
           PASSWORD: ${{ secrets.PASSWORD }}
           IMAGE_NAME: ${{ secrets.IMAGE_NAME }}
         run: |
-          docker build --no-cache -t ${USERNAME}/${IMAGE_NAME}:latest .
+          docker build --no-cache -t ${USERNAME}/${IMAGE_NAME}:latest ./build/docker/Dockerfile
           docker push ${USERNAME}/${IMAGE_NAME}:latest
