@@ -31,6 +31,16 @@ tasks:
     cmds:
       - "docker compose -f compose/dc.prod.yaml down"
 
+  dc-metrics:
+    desc: Run metrics compose
+    cmds:
+      - "docker compose -f compose/dc.metrics.yaml up"
+
+  dc-metrics-down:
+    desc: Shutdown metrics compose
+    cmds:
+      - "docker compose -f compose/dc.metrics.yaml down"
+
   k-up:
     desc: Run k8s manifests
     cmds:

@@ -56,7 +56,7 @@ WHERE username=$2
 
 const createTransaction = `
 INSERT INTO transactions (from_user_id, to_user_id, amount)
-VALUES ($1, $2, $3)
+VALUES ($1, (SELECT id FROM users WHERE username=$2), $3)
 `
 
 const upsertInventory = `

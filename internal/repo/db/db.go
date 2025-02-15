@@ -16,7 +16,6 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/opentracing/opentracing-go"
 	"go.uber.org/zap"
-	"os"
 	"path/filepath"
 	"strings"
 )
@@ -84,24 +83,6 @@ func applyMigrations(db *sql.DB, conf *conf.DBConfig) error {
 
 	zap.L().Info("Applied migrations")
 	return nil
-}
-
-func findRootDir() (string, error) {
-	dir, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
-
-	for {
-		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
-			return dir, nil
-		}
-		if dir == "/" {
-			break
-		}
-		dir = filepath.Dir(dir)
-	}
-	return "", fmt.Errorf("go.mod not found, unable to determine root directory")
 }
 
 func (r *Repository) GetUserByUsername(ctx context.Context, name string) (*model.User, error) {
@@ -226,67 +207,47 @@ func (r *Repository) SendCoin(ctx context.Context, uid uuid.UUID, req *dto.SendC
 	if err != nil {
 		return err
 	}
+	defer func() {
+		if rbErr := tx.Rollback(); rbErr != nil && !errors.Is(rbErr, sql.ErrTxDone) {
+			zap.L().Error(
+				"Error while transaction rollback",
+				zap.Error(err), zap.Error(rbErr),
+				zap.String("uid", uid.String()),
+				zap.Any("req", req),
+			)
+		}
+	}()
 
 	res, err := tx.Exec(sendCoinFrom, req.Amount, uid)
 	if err != nil {
-		if rbErr := tx.Rollback(); rbErr != nil {
-			zap.L().Error(
-				"Error while transaction rollback",
-				zap.Error(err), zap.Error(rbErr),
-				zap.String("uid", uid.String()),
-				zap.Any("req", req),
-			)
-		}
 		return err
 	}
 
-	if aff, err := res.RowsAffected(); err != nil || aff == 0 {
-		if rbErr := tx.Rollback(); rbErr != nil {
-			zap.L().Error(
-				"Error while transaction rollback",
-				zap.Error(err), zap.Error(rbErr),
-				zap.String("uid", uid.String()),
-				zap.Any("req", req),
-			)
-		}
+	aff, err := res.RowsAffected()
+	if err != nil {
 		return err
+	}
+
+	if aff == 0 {
+		return repo.ErrNotFound
 	}
 
 	res, err = tx.Exec(sendCoinTo, req.Amount, req.ToUser)
 	if err != nil {
-		if rbErr := tx.Rollback(); rbErr != nil {
-			zap.L().Error(
-				"Error while transaction rollback",
-				zap.Error(err), zap.Error(rbErr),
-				zap.String("uid", uid.String()),
-				zap.Any("req", req),
-			)
-		}
 		return err
 	}
 
-	if aff, err := res.RowsAffected(); err != nil || aff == 0 {
-		if rbErr := tx.Rollback(); rbErr != nil {
-			zap.L().Error(
-				"Error while transaction rollback",
-				zap.Error(err), zap.Error(rbErr),
-				zap.String("uid", uid.String()),
-				zap.Any("req", req),
-			)
-		}
+	aff, err = res.RowsAffected()
+	if err != nil {
 		return err
+	}
+
+	if aff == 0 {
+		return repo.ErrNotFound
 	}
 
 	res, err = tx.Exec(createTransaction, uid, req.ToUser, req.Amount)
 	if err != nil {
-		if rbErr := tx.Rollback(); rbErr != nil {
-			zap.L().Error(
-				"Error while transaction rollback",
-				zap.Error(err), zap.Error(rbErr),
-				zap.String("uid", uid.String()),
-				zap.Any("req", req),
-			)
-		}
 		return err
 	}
 
@@ -306,67 +267,43 @@ func (r *Repository) BuyItem(ctx context.Context, uid uuid.UUID, item string) er
 	if err != nil {
 		return err
 	}
+	defer func() {
+		if err := tx.Rollback(); err != nil && !errors.Is(err, sql.ErrTxDone) {
+			zap.L().Error(
+				"Error while transaction rollback",
+				zap.Error(err),
+				zap.String("uid", uid.String()),
+				zap.Any("item", item),
+			)
+		}
+	}()
 
 	itemObj := model.Item{}
 	err = tx.QueryRow(getItem, item).Scan(
 		&itemObj.ID, &itemObj.Name, &itemObj.Price,
 	)
 	if err != nil && errors.Is(err, sql.ErrNoRows) {
-		_ = tx.Rollback()
 		return repo.ErrNotFound
 	} else if err != nil {
-		_ = tx.Rollback()
 		return err
 	}
 
 	res, err := tx.Exec(sendCoinFrom, itemObj.Price, uid)
 	if err != nil {
-		if rbErr := tx.Rollback(); rbErr != nil {
-			zap.L().Error(
-				"Error while transaction rollback",
-				zap.Error(err), zap.Error(rbErr),
-				zap.String("uid", uid.String()),
-				zap.Any("item", item),
-			)
-		}
 		return err
 	}
 
 	aff, err := res.RowsAffected()
 	if err != nil {
-		if rbErr := tx.Rollback(); rbErr != nil {
-			zap.L().Error(
-				"Error while transaction rollback",
-				zap.Error(err), zap.Error(rbErr),
-				zap.String("uid", uid.String()),
-				zap.Any("item", item),
-			)
-		}
 		return err
 	}
 
 	if aff == 0 {
-		if rbErr := tx.Rollback(); rbErr != nil {
-			zap.L().Error(
-				"Error while transaction rollback",
-				zap.Error(err), zap.Error(rbErr),
-				zap.String("uid", uid.String()),
-				zap.Any("item", item),
-			)
-		}
 		return repo.ErrNotFound
 	}
 
 	res, err = tx.Exec(upsertInventory, uid, itemObj.ID)
 	if err != nil {
-		if rbErr := tx.Rollback(); rbErr != nil {
-			zap.L().Error(
-				"Error while transaction rollback",
-				zap.Error(err), zap.Error(rbErr),
-				zap.String("uid", uid.String()),
-				zap.Any("item", item),
-			)
-		}
 		return err
 	}
 

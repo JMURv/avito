@@ -97,14 +97,131 @@ func setupTestServer() (*httptest.Server, auth.AuthService, func()) {
 }
 
 func TestOverall(t *testing.T) {
-	// TODO: тест сценарий: аутентификация за двух юзеров, оба отправляют друг другу коины, проверка через гет инфо правильности балансов и транзакций, покупка предметов, проверка через гет инфо инвентаря
-	const authURI = "/api/auth"
-	const getInfoURI = "/api/info"
-	const sendCoinuri = "/api/sendCoin"
-	const buyItemURI = "/api/buy/"
+	const (
+		getInfoURI  = "/api/info"
+		sendCoinURI = "/api/sendCoin"
+		buyItemURI  = "/api/buy/"
+	)
+
 	ts, _, cleanUp := setupTestServer()
 	defer ts.Close()
 	t.Cleanup(cleanUp)
+
+	user1name := "user1"
+	user1Token := registerAndLogin(t, ts, user1name, "pass1")
+
+	user2name := "user2"
+	user2Token := registerAndLogin(t, ts, user2name, "pass2")
+
+	getUserInfo := func(t *testing.T, token string) dto.InfoResponse {
+		req, _ := http.NewRequest(http.MethodGet, ts.URL+getInfoURI, nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer func(Body io.ReadCloser) {
+			if err := Body.Close(); err != nil {
+				zap.L().Debug("Error while closing body", zap.Error(err))
+			}
+		}(resp.Body)
+
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+
+		var info dto.InfoResponse
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&info))
+		return info
+	}
+
+	sendCoins := func(t *testing.T, senderToken string, receiverUsername string, amount int) {
+		body, _ := json.Marshal(
+			map[string]interface{}{
+				"toUser": receiverUsername,
+				"amount": amount,
+			},
+		)
+
+		req, _ := http.NewRequest(
+			http.MethodPost,
+			ts.URL+sendCoinURI,
+			bytes.NewReader(body),
+		)
+		req.Header.Set("Authorization", "Bearer "+senderToken)
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer func(Body io.ReadCloser) {
+			if err := Body.Close(); err != nil {
+				zap.L().Debug("Error while closing body", zap.Error(err))
+			}
+		}(resp.Body)
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+	}
+
+	buyItem := func(t *testing.T, token string, item string) {
+		req, _ := http.NewRequest(
+			http.MethodGet,
+			ts.URL+buyItemURI+item,
+			nil,
+		)
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+	}
+
+	t.Run(
+		"Initial balances", func(t *testing.T) {
+			user1Info := getUserInfo(t, user1Token)
+			user2Info := getUserInfo(t, user2Token)
+			assert.Equal(t, config.DefaultBalance, user1Info.Coins)
+			assert.Equal(t, config.DefaultBalance, user2Info.Coins)
+		},
+	)
+
+	t.Run(
+		"Send coins between users", func(t *testing.T) {
+			sendCoins(t, user1Token, user2name, 200)
+
+			user1Info := getUserInfo(t, user1Token)
+			user2Info := getUserInfo(t, user2Token)
+			assert.Equal(t, 800, user1Info.Coins)
+			assert.Equal(t, 1200, user2Info.Coins)
+			require.Len(t, user1Info.CoinHistory.Sent, 1)
+			assert.Equal(t, user2name, user1Info.CoinHistory.Sent[0].ToUser)
+			assert.Equal(t, 200, user1Info.CoinHistory.Sent[0].Amount)
+			require.Len(t, user2Info.CoinHistory.Received, 1)
+			assert.Equal(t, user1name, user2Info.CoinHistory.Received[0].FromUser)
+			assert.Equal(t, 200, user2Info.CoinHistory.Received[0].Amount)
+
+			sendCoins(t, user2Token, user1name, 100)
+			user1Info = getUserInfo(t, user1Token)
+			user2Info = getUserInfo(t, user2Token)
+			assert.Equal(t, 900, user1Info.Coins)
+			assert.Equal(t, 1100, user2Info.Coins)
+		},
+	)
+
+	t.Run(
+		"Purchase items and verify inventory", func(t *testing.T) {
+			buyItem(t, user1Token, "powerbank")
+			buyItem(t, user2Token, "hoody")
+
+			user1Info := getUserInfo(t, user1Token)
+			user2Info := getUserInfo(t, user2Token)
+			assert.Equal(t, 700, user1Info.Coins) // 900 - 200
+			assert.Equal(t, 800, user2Info.Coins) // 1100 - 300
+
+			require.Len(t, user1Info.Inventory, 1)
+			assert.Equal(t, "powerbank", user1Info.Inventory[0].Type)
+			assert.Equal(t, 1, user1Info.Inventory[0].Quantity)
+			require.Len(t, user2Info.Inventory, 1)
+			assert.Equal(t, "hoody", user2Info.Inventory[0].Type)
+			assert.Equal(t, 1, user2Info.Inventory[0].Quantity)
+		},
+	)
 }
 
 func TestAuth(t *testing.T) {

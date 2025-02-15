@@ -396,23 +396,6 @@ func TestRepository_SendCoin(t *testing.T) {
 			},
 		},
 		{
-			name: "sendCoinFrom -- RollbackErr",
-			mockExpect: func() {
-				mock.ExpectBegin()
-
-				mock.ExpectExec(regexp.QuoteMeta(sendCoinFrom)).
-					WithArgs(req.Amount, uid).
-					WillReturnError(testErr)
-
-				mock.ExpectRollback().WillReturnError(testErr)
-
-			},
-			expectedResp: func(t *testing.T, res any, err error) {
-				assert.Error(t, err)
-				assert.Equal(t, testErr, err)
-			},
-		},
-		{
 			name: "sendCoinFrom -- ErrInternal",
 			mockExpect: func() {
 				mock.ExpectBegin()
@@ -441,7 +424,8 @@ func TestRepository_SendCoin(t *testing.T) {
 				mock.ExpectRollback()
 			},
 			expectedResp: func(t *testing.T, res any, err error) {
-				assert.Nil(t, err)
+				assert.Error(t, err)
+				assert.Equal(t, repo.ErrNotFound, err)
 			},
 		},
 		{
@@ -455,27 +439,6 @@ func TestRepository_SendCoin(t *testing.T) {
 
 			},
 			expectedResp: func(t *testing.T, res any, err error) {},
-		},
-		{
-			name: "sendCoinTo -- RollbackErr",
-			mockExpect: func() {
-				mock.ExpectBegin()
-
-				mock.ExpectExec(regexp.QuoteMeta(sendCoinFrom)).
-					WithArgs(req.Amount, uid).
-					WillReturnResult(sqlmock.NewResult(1, 1))
-
-				mock.ExpectExec(regexp.QuoteMeta(sendCoinTo)).
-					WithArgs(req.Amount, req.ToUser).
-					WillReturnError(testErr)
-
-				mock.ExpectRollback().WillReturnError(testErr)
-
-			},
-			expectedResp: func(t *testing.T, res any, err error) {
-				assert.Error(t, err)
-				assert.Equal(t, testErr, err)
-			},
 		},
 		{
 			name: "sendCoinTo -- ErrInternal",
@@ -514,7 +477,8 @@ func TestRepository_SendCoin(t *testing.T) {
 				mock.ExpectRollback()
 			},
 			expectedResp: func(t *testing.T, res any, err error) {
-				assert.Nil(t, err)
+				assert.Error(t, err)
+				assert.Equal(t, repo.ErrNotFound, err)
 			},
 		},
 		{
@@ -532,31 +496,6 @@ func TestRepository_SendCoin(t *testing.T) {
 
 			},
 			expectedResp: func(t *testing.T, res any, err error) {},
-		},
-		{
-			name: "createTransaction -- RollbackErr",
-			mockExpect: func() {
-				mock.ExpectBegin()
-
-				mock.ExpectExec(regexp.QuoteMeta(sendCoinFrom)).
-					WithArgs(req.Amount, uid).
-					WillReturnResult(sqlmock.NewResult(1, 1))
-
-				mock.ExpectExec(regexp.QuoteMeta(sendCoinTo)).
-					WithArgs(req.Amount, req.ToUser).
-					WillReturnResult(sqlmock.NewResult(1, 1))
-
-				mock.ExpectExec(regexp.QuoteMeta(createTransaction)).
-					WithArgs(uid, req.ToUser, req.Amount).
-					WillReturnError(testErr)
-
-				mock.ExpectRollback().WillReturnError(testErr)
-
-			},
-			expectedResp: func(t *testing.T, res any, err error) {
-				assert.Error(t, err)
-				assert.Equal(t, testErr, err)
-			},
 		},
 		{
 			name: "createTransaction -- InternalErr",
@@ -678,33 +617,6 @@ func TestRepository_BuyItem(t *testing.T) {
 					WillReturnError(testErr)
 
 				mock.ExpectRollback()
-			},
-			expectedResp: func(t *testing.T, res any, err error) {
-				assert.Error(t, err)
-				assert.Equal(t, testErr, err)
-			},
-		},
-		{
-			name: "sendCoinFrom -- RollbackErr",
-			mockExpect: func() {
-				mock.ExpectBegin()
-
-				mock.ExpectQuery(regexp.QuoteMeta(getItem)).
-					WithArgs(item).
-					WillReturnRows(
-						sqlmock.NewRows([]string{"id", "name", "price"}).AddRow(
-							itemObj.ID.String(),
-							itemObj.Name,
-							itemObj.Price,
-						),
-					)
-
-				mock.ExpectExec(regexp.QuoteMeta(sendCoinFrom)).
-					WithArgs(itemObj.Price, uid).
-					WillReturnError(testErr)
-
-				mock.ExpectRollback().WillReturnError(testErr)
-
 			},
 			expectedResp: func(t *testing.T, res any, err error) {
 				assert.Error(t, err)

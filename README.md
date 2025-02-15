@@ -1,9 +1,6 @@
+[![Go Coverage](https://github.com/JMURv/avito/wiki/coverage.svg)](https://raw.githack.com/wiki/JMURv/avito/coverage.html)
+
 ## Configuration
-
-### GitHub Actions
-- Specify **Docker Hub** `USERNAME`, `PASSWORD` and desired `IMAGE_NAME` secrets in GH Actions repo
-
-This is required to build and push docker image
 
 ### App
 Configuration files placed in `/configs/{local|dev|prod}.config.yaml`
@@ -11,9 +8,10 @@ Example file looks like that:
 
 ```yaml
 serviceName: "svc-name"
+secret: "DYHlaJpPiZ"
 
 server:
-  mode: "dev" # dev, prod
+  mode: "dev"
   port: 8080
   scheme: "http"
   domain: "localhost"
@@ -21,13 +19,9 @@ server:
 db:
   host: "localhost"
   port: 5432
-  user: "app_owner"
-  password: "app_password"
+  user: "postgres"
+  password: "794613825Zx"
   database: "app_db"
-
-redis:
-  addr: "localhost:6379"
-  pass: ""
 
 jaeger:
   sampler:
@@ -131,6 +125,59 @@ Shutdown manifests
 ```shell
 task k-down
 ```
+
+___
+
+### Tests
+
+There are tests for each layer, run them via `task` or manually:
+
+```yaml
+  t:
+    desc: Run tests
+    cmds:
+      - "task t-hdl"
+      - "task t-ctrl"
+      - "task t-repo"
+      - "task t-integ"
+
+  t-hdl:
+    desc: Test handlers
+    cmds:
+      - "task t-http"
+      - "task t-grpc"
+
+  t-http:
+    desc: Test http handlers
+    cmds:
+      - "go test ./internal/hdl/http"
+      - "go test -coverprofile=cov_http.out ./internal/hdl/http && go tool cover -func=cov_http.out"
+
+  t-grpc:
+    desc: Test grpc handlers
+    cmds:
+      - "go test ./internal/hdl/grpc"
+      - "go test -coverprofile=cov_grpc.out ./internal/hdl/grpc && go tool cover -func=cov_grpc.out"
+
+  t-ctrl:
+    desc: Run ctrl tests
+    cmds:
+      - "go test ./internal/ctrl"
+      - "go test -coverprofile=cov_ctrl.out ./internal/ctrl && go tool cover -func=cov_ctrl.out"
+
+  t-repo:
+    desc: Run repo tests
+    cmds:
+      - "go test ./internal/repo/db"
+      - "go test -coverprofile=cov_repo.out ./internal/repo/db && go tool cover -func=cov_repo.out"
+
+  t-integ:
+    desc: Run integration tests
+    cmds:
+      - "go test ./tests/"
+```
+
+## Questions
 
 ```sql
 SELECT u.balance, 
