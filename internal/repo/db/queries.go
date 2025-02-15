@@ -7,7 +7,7 @@ WHERE username = $1
 `
 
 const getUserBalance = `
-SELECT u.balance FROM users WHERE u.id=$1
+SELECT u.balance FROM users u WHERE u.id=$1
 `
 
 const getUserInventory = `
@@ -21,9 +21,9 @@ LIMIT $2 OFFSET $3
 const getUserTransactions = `
 SELECT 
     t.from_user_id,
-    u.name AS from_username,
+    u.username AS from_username,
     t.to_user_id,
-    u1.name AS to_username,
+    u1.username AS to_username,
     t.amount 
 FROM transactions t
 JOIN users u ON u.id=t.from_user_id
@@ -45,12 +45,12 @@ WHERE name=$1
 `
 
 const sendCoinFrom = `
-UPDATE users SET amount=amount-$1
-WHERE id=$2
+UPDATE users SET balance = balance - $1
+WHERE id = $2
 `
 
 const sendCoinTo = `
-UPDATE users SET amount=amount+$1
+UPDATE users SET balance = balance + $1
 WHERE username=$2
 `
 
@@ -59,12 +59,9 @@ INSERT INTO transactions (from_user_id, to_user_id, amount)
 VALUES ($1, $2, $3)
 `
 
-const createInventory = `
+const upsertInventory = `
 INSERT INTO inventory (user_id, item_id, quantity)
-VALUES ($1, $2, $3)
-`
-
-const getInventoryQuantity = `
-SELECT quantity FROM inventory
-WHERE user_id=$1 AND item_id=$2
+VALUES ($1, $2, 1)
+ON CONFLICT (user_id, item_id)
+DO UPDATE SET quantity = inventory.quantity + 1;
 `

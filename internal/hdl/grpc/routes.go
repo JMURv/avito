@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/JMURv/avito/api/grpc/gen"
 	"github.com/JMURv/avito/internal/auth"
+	"github.com/JMURv/avito/internal/config"
 	"github.com/JMURv/avito/internal/ctrl"
 	"github.com/JMURv/avito/internal/dto"
 	mappers "github.com/JMURv/avito/internal/dto/mapper"
@@ -68,7 +69,7 @@ func (h *Handler) Auth(ctx context.Context, req *gen.AuthReq) (*gen.TokenRes, er
 	}, nil
 }
 
-func (h *Handler) GetInfo(ctx context.Context, req *gen.Empty) (*gen.InfoResponse, error) {
+func (h *Handler) GetInfo(ctx context.Context, req *gen.PageAndSize) (*gen.InfoResponse, error) {
 	s, c := time.Now(), codes.OK
 	const op = "store.GetInfo.hdl"
 	span := opentracing.GlobalTracer().StartSpan(op)
@@ -104,7 +105,15 @@ func (h *Handler) GetInfo(ctx context.Context, req *gen.Empty) (*gen.InfoRespons
 		return nil, status.Error(c, hdl.ErrDecodeRequest.Error())
 	}
 
-	res, err := h.ctrl.GetInfo(ctx, uid)
+	if req.Page <= 0 {
+		req.Page = config.DefaultPage
+	}
+
+	if req.Size <= 0 {
+		req.Size = config.DefaultSize
+	}
+
+	res, err := h.ctrl.GetInfo(ctx, uid, int(req.Page), int(req.Size))
 	if err != nil {
 		c = codes.Internal
 		zap.L().Debug(

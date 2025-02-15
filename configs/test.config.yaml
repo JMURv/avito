@@ -2,7 +2,7 @@ serviceName: "svc-name"
 secret: "DYHlaJpPiZ"
 
 server:
-  mode: "dev"
+  mode: "test"
   port: 8080
   scheme: "http"
   domain: "localhost"
@@ -10,9 +10,9 @@ server:
 db:
   host: "localhost"
   port: 5432
-  user: "postgres"
-  password: "794613825Zx"
-  database: "app_db"
+  user: "app_user"
+  password: "superstrongpassword"
+  database: "app_test"
 
 jaeger:
   sampler:

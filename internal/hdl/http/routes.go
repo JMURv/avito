@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/JMURv/avito/internal/auth"
+	"github.com/JMURv/avito/internal/config"
+	"github.com/JMURv/avito/internal/ctrl"
 	"github.com/JMURv/avito/internal/dto"
 	"github.com/JMURv/avito/internal/hdl"
 	"github.com/JMURv/avito/internal/hdl/http/middleware"
@@ -14,6 +16,7 @@ import (
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -112,8 +115,22 @@ func (h *Handler) getInfo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	res, err := h.ctrl.GetInfo(r.Context(), uid)
+	page, err := strconv.ParseInt(r.URL.Query().Get("page"), 10, 64)
 	if err != nil {
+		page = config.DefaultPage
+	}
+
+	size, err := strconv.ParseInt(r.URL.Query().Get("size"), 10, 64)
+	if err != nil {
+		size = config.DefaultSize
+	}
+
+	res, err := h.ctrl.GetInfo(r.Context(), uid, int(page), int(size))
+	if err != nil && errors.Is(err, ctrl.ErrNotFound) {
+		c = http.StatusNotFound
+		utils.ErrResponse(w, c, err)
+		return
+	} else if err != nil {
 		c = http.StatusInternalServerError
 		zap.L().Debug(
 			hdl.ErrInternal.Error(),

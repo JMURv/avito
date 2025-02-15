@@ -30,7 +30,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type StoreClient interface {
 	Auth(ctx context.Context, in *AuthReq, opts ...grpc.CallOption) (*TokenRes, error)
-	GetInfo(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*InfoResponse, error)
+	GetInfo(ctx context.Context, in *PageAndSize, opts ...grpc.CallOption) (*InfoResponse, error)
 	SendCoin(ctx context.Context, in *SendCoinRequest, opts ...grpc.CallOption) (*Empty, error)
 	BuyItem(ctx context.Context, in *BuyItemRequest, opts ...grpc.CallOption) (*Empty, error)
 }
@@ -53,7 +53,7 @@ func (c *storeClient) Auth(ctx context.Context, in *AuthReq, opts ...grpc.CallOp
 	return out, nil
 }
 
-func (c *storeClient) GetInfo(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*InfoResponse, error) {
+func (c *storeClient) GetInfo(ctx context.Context, in *PageAndSize, opts ...grpc.CallOption) (*InfoResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(InfoResponse)
 	err := c.cc.Invoke(ctx, Store_GetInfo_FullMethodName, in, out, cOpts...)
@@ -88,7 +88,7 @@ func (c *storeClient) BuyItem(ctx context.Context, in *BuyItemRequest, opts ...g
 // for forward compatibility.
 type StoreServer interface {
 	Auth(context.Context, *AuthReq) (*TokenRes, error)
-	GetInfo(context.Context, *Empty) (*InfoResponse, error)
+	GetInfo(context.Context, *PageAndSize) (*InfoResponse, error)
 	SendCoin(context.Context, *SendCoinRequest) (*Empty, error)
 	BuyItem(context.Context, *BuyItemRequest) (*Empty, error)
 	mustEmbedUnimplementedStoreServer()
@@ -104,7 +104,7 @@ type UnimplementedStoreServer struct{}
 func (UnimplementedStoreServer) Auth(context.Context, *AuthReq) (*TokenRes, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Auth not implemented")
 }
-func (UnimplementedStoreServer) GetInfo(context.Context, *Empty) (*InfoResponse, error) {
+func (UnimplementedStoreServer) GetInfo(context.Context, *PageAndSize) (*InfoResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetInfo not implemented")
 }
 func (UnimplementedStoreServer) SendCoin(context.Context, *SendCoinRequest) (*Empty, error) {
@@ -153,7 +153,7 @@ func _Store_Auth_Handler(srv interface{}, ctx context.Context, dec func(interfac
 }
 
 func _Store_GetInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Empty)
+	in := new(PageAndSize)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -165,7 +165,7 @@ func _Store_GetInfo_Handler(srv interface{}, ctx context.Context, dec func(inter
 		FullMethod: Store_GetInfo_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(StoreServer).GetInfo(ctx, req.(*Empty))
+		return srv.(StoreServer).GetInfo(ctx, req.(*PageAndSize))
 	}
 	return interceptor(ctx, in, info, handler)
 }

@@ -73,18 +73,18 @@ func (mr *MockAppRepoMockRecorder) CreateUser(ctx, username, pswd any) *gomock.C
 }
 
 // GetInfo mocks base method.
-func (m *MockAppRepo) GetInfo(ctx context.Context, uid uuid.UUID) (*dto.InfoResponse, error) {
+func (m *MockAppRepo) GetInfo(ctx context.Context, uid uuid.UUID, page, size int) (*dto.InfoResponse, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetInfo", ctx, uid)
+	ret := m.ctrl.Call(m, "GetInfo", ctx, uid, page, size)
 	ret0, _ := ret[0].(*dto.InfoResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetInfo indicates an expected call of GetInfo.
-func (mr *MockAppRepoMockRecorder) GetInfo(ctx, uid any) *gomock.Call {
+func (mr *MockAppRepoMockRecorder) GetInfo(ctx, uid, page, size any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetInfo", reflect.TypeOf((*MockAppRepo)(nil).GetInfo), ctx, uid)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetInfo", reflect.TypeOf((*MockAppRepo)(nil).GetInfo), ctx, uid, page, size)
 }
 
 // GetUserByUsername mocks base method.
@@ -170,18 +170,18 @@ func (mr *MockAppCtrlMockRecorder) BuyItem(ctx, uid, item any) *gomock.Call {
 }
 
 // GetInfo mocks base method.
-func (m *MockAppCtrl) GetInfo(ctx context.Context, uid uuid.UUID) (*dto.InfoResponse, error) {
+func (m *MockAppCtrl) GetInfo(ctx context.Context, uid uuid.UUID, page, size int) (*dto.InfoResponse, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetInfo", ctx, uid)
+	ret := m.ctrl.Call(m, "GetInfo", ctx, uid, page, size)
 	ret0, _ := ret[0].(*dto.InfoResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetInfo indicates an expected call of GetInfo.
-func (mr *MockAppCtrlMockRecorder) GetInfo(ctx, uid any) *gomock.Call {
+func (mr *MockAppCtrlMockRecorder) GetInfo(ctx, uid, page, size any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetInfo", reflect.TypeOf((*MockAppCtrl)(nil).GetInfo), ctx, uid)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetInfo", reflect.TypeOf((*MockAppCtrl)(nil).GetInfo), ctx, uid, page, size)
 }
 
 // SendCoin mocks base method.

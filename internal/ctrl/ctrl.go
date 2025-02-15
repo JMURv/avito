@@ -15,14 +15,14 @@ import (
 type AppRepo interface {
 	GetUserByUsername(ctx context.Context, name string) (*model.User, error)
 	CreateUser(ctx context.Context, username, pswd string) (uuid.UUID, error)
-	GetInfo(ctx context.Context, uid uuid.UUID) (*dto.InfoResponse, error)
+	GetInfo(ctx context.Context, uid uuid.UUID, page, size int) (*dto.InfoResponse, error)
 	SendCoin(ctx context.Context, uid uuid.UUID, req *dto.SendCoinRequest) error
 	BuyItem(ctx context.Context, uid uuid.UUID, item string) error
 }
 
 type AppCtrl interface {
 	AuthUser(ctx context.Context, req *model.User) (*dto.TokenResponse, error)
-	GetInfo(ctx context.Context, uid uuid.UUID) (*dto.InfoResponse, error)
+	GetInfo(ctx context.Context, uid uuid.UUID, page, size int) (*dto.InfoResponse, error)
 	SendCoin(ctx context.Context, uid uuid.UUID, req *dto.SendCoinRequest) error
 	BuyItem(ctx context.Context, uid uuid.UUID, item string) error
 }
@@ -71,24 +71,24 @@ func (c *Controller) AuthUser(ctx context.Context, req *model.User) (*dto.TokenR
 		return nil, err
 	}
 
-	if err = c.auth.ComparePasswords([]byte(req.Password), []byte(res.Password)); err != nil {
+	if err = c.auth.ComparePasswords([]byte(res.Password), []byte(req.Password)); err != nil {
 		return nil, err
 	}
 
-	token, err := c.auth.NewToken(req.ID)
+	token, err := c.auth.NewToken(res.ID)
 	if err != nil {
 		return nil, err
 	}
 	return &dto.TokenResponse{Token: token}, nil
 }
 
-func (c *Controller) GetInfo(ctx context.Context, uid uuid.UUID) (*dto.InfoResponse, error) {
+func (c *Controller) GetInfo(ctx context.Context, uid uuid.UUID, page, size int) (*dto.InfoResponse, error) {
 	const op = "store.GetInfo.ctrl"
 	span, _ := opentracing.StartSpanFromContext(ctx, op)
 	ctx = opentracing.ContextWithSpan(ctx, span)
 	defer span.Finish()
 
-	res, err := c.repo.GetInfo(ctx, uid)
+	res, err := c.repo.GetInfo(ctx, uid, page, size)
 	if err != nil && errors.Is(err, repo.ErrNotFound) {
 		return nil, ErrNotFound
 	} else if err != nil {

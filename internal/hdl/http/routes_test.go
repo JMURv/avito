@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/JMURv/avito/internal/auth"
+	"github.com/JMURv/avito/internal/config"
 	"github.com/JMURv/avito/internal/dto"
 	"github.com/JMURv/avito/internal/hdl"
 	"github.com/JMURv/avito/internal/hdl/http/utils"
@@ -305,7 +306,7 @@ func TestHandler_GetInfo(t *testing.T) {
 			status:  http.StatusInternalServerError,
 			mockExpect: func() {
 				mctrl.EXPECT().GetInfo(
-					gomock.Any(), uuid.MustParse(uid),
+					gomock.Any(), uuid.MustParse(uid), config.DefaultPage, config.DefaultSize,
 				).Return(nil, errors.New("test-err"))
 			},
 			expectedResp: func(t *testing.T, res any) {
@@ -323,7 +324,7 @@ func TestHandler_GetInfo(t *testing.T) {
 			status:  http.StatusOK,
 			mockExpect: func() {
 				mctrl.EXPECT().GetInfo(
-					gomock.Any(), uuid.MustParse(uid),
+					gomock.Any(), uuid.MustParse(uid), config.DefaultPage, config.DefaultSize,
 				).Return(successDTO, nil)
 			},
 			expectedResp: func(t *testing.T, res any) {

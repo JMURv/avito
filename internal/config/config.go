@@ -7,6 +7,7 @@ import (
 
 type Config struct {
 	ServiceName string        `yaml:"serviceName" env-required:"true"`
+	Secret      string        `yaml:"secret" env-required:"true"`
 	Server      *ServerConfig `yaml:"server"`
 	DB          *DBConfig     `yaml:"db"`
 	Redis       *RedisConfig  `yaml:"redis"`

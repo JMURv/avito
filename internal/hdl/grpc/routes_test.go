@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/JMURv/avito/api/grpc/gen"
 	"github.com/JMURv/avito/internal/auth"
+	"github.com/JMURv/avito/internal/config"
 	"github.com/JMURv/avito/internal/ctrl"
 	"github.com/JMURv/avito/internal/dto"
 	mappers "github.com/JMURv/avito/internal/dto/mapper"
@@ -164,7 +165,7 @@ func TestHandler_GetInfo(t *testing.T) {
 	tests := []struct {
 		ctx          context.Context
 		name         string
-		req          *gen.Empty
+		req          *gen.PageAndSize
 		mockExpect   func()
 		expectedResp func(*testing.T, *gen.InfoResponse, error)
 	}{
@@ -181,7 +182,7 @@ func TestHandler_GetInfo(t *testing.T) {
 		{
 			ctx:        emptyCtx,
 			name:       "ErrFailedToGetUUID",
-			req:        &gen.Empty{},
+			req:        &gen.PageAndSize{},
 			mockExpect: func() {},
 			expectedResp: func(t *testing.T, res *gen.InfoResponse, err error) {
 				assert.Nil(t, res)
@@ -191,7 +192,7 @@ func TestHandler_GetInfo(t *testing.T) {
 		{
 			ctx:        failureCtx,
 			name:       "ErrFailedToParseUUID",
-			req:        &gen.Empty{},
+			req:        &gen.PageAndSize{},
 			mockExpect: func() {},
 			expectedResp: func(t *testing.T, res *gen.InfoResponse, err error) {
 				assert.Nil(t, res)
@@ -201,9 +202,12 @@ func TestHandler_GetInfo(t *testing.T) {
 		{
 			ctx:  successCtx,
 			name: "ErrInternal",
-			req:  &gen.Empty{},
+			req:  &gen.PageAndSize{},
 			mockExpect: func() {
-				mctrl.EXPECT().GetInfo(gomock.Any(), gomock.Any()).Return(nil, errors.New("test-err"))
+				mctrl.EXPECT().GetInfo(gomock.Any(), gomock.Any(), config.DefaultPage, config.DefaultSize).Return(
+					nil,
+					errors.New("test-err"),
+				)
 			},
 			expectedResp: func(t *testing.T, res *gen.InfoResponse, err error) {
 				assert.Nil(t, res)
@@ -213,9 +217,9 @@ func TestHandler_GetInfo(t *testing.T) {
 		{
 			ctx:  successCtx,
 			name: "Success",
-			req:  &gen.Empty{},
+			req:  &gen.PageAndSize{},
 			mockExpect: func() {
-				mctrl.EXPECT().GetInfo(gomock.Any(), gomock.Any()).Return(
+				mctrl.EXPECT().GetInfo(gomock.Any(), gomock.Any(), config.DefaultPage, config.DefaultSize).Return(
 					successDTO, nil,
 				).Times(1)
 			},

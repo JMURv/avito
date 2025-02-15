@@ -26,7 +26,7 @@ func SendCoinReq(req *dto.SendCoinRequest) error {
 		return ToUserIsRequired
 	}
 
-	if req.Amount == 0 {
+	if req.Amount <= 0 {
 		return AmountIsRequired
 	}
 

@@ -4,9 +4,14 @@ option go_package = "github.com/JMURv/avito/api/grpc/gen";
 
 message Empty {}
 
+message PageAndSize {
+  int32 page = 1;
+  int32 size = 2;
+}
+
 service Store {
   rpc Auth(AuthReq) returns (TokenRes);
-  rpc GetInfo(Empty) returns (InfoResponse);
+  rpc GetInfo(PageAndSize) returns (InfoResponse);
   rpc SendCoin(SendCoinRequest) returns (Empty);
   rpc BuyItem(BuyItemRequest) returns (Empty);
 }

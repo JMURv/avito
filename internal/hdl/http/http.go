@@ -9,7 +9,9 @@ import (
 	mid "github.com/JMURv/avito/internal/hdl/http/middleware"
 	"github.com/JMURv/avito/internal/hdl/http/utils"
 	"go.uber.org/zap"
+	"log"
 	"net/http"
+	"reflect"
 	"strings"
 	"time"
 )
@@ -77,6 +79,7 @@ func (h *Handler) authMiddleware(next http.Handler) http.Handler {
 
 			claims, err := h.au.VerifyToken(tokenStr)
 			if err != nil {
+				log.Println(err, reflect.TypeOf(err))
 				utils.ErrResponse(w, http.StatusUnauthorized, err)
 				return
 			}

@@ -32,6 +32,12 @@ tasks:
       - mockgen -source="./internal/ctrl/ctrl.go" -destination="tests/mocks/mock_ctrl.go" -package=mocks
       - mockgen -source="./internal/auth/auth.go" -destination="tests/mocks/mock_auth.go" -package=mocks
 
+
+  t-integ:
+    desc: Run integration tests
+    cmds:
+      - "go test ./tests/"
+
   t:
     desc: Run tests
     cmds:
@@ -64,11 +70,11 @@ tasks:
     cmds:
       - "go test ./internal/ctrl"
       - "go test -coverprofile=cov_ctrl.out ./internal/ctrl && go tool cover -func=cov_ctrl.out"
-      - "go test -coverprofile=cov_ctrl.out ./internal/ctrl && go tool cover -html=cov_ctrl.out"
+      #- "go test -coverprofile=cov_ctrl.out ./internal/ctrl && go tool cover -html=cov_ctrl.out"
 
   t-repo:
     desc: Run repo tests
     cmds:
       - "go test ./internal/repo/db"
       - "go test -coverprofile=cov_repo.out ./internal/repo/db && go tool cover -func=cov_repo.out"
-      - "go test -coverprofile=cov_repo.out ./internal/repo/db && go tool cover -html=cov_repo.out"
+      #- "go test -coverprofile=cov_repo.out ./internal/repo/db && go tool cover -html=cov_repo.out"
